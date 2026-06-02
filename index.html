@@ -1,0 +1,700 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Server Wake Utility</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=VT323&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { height: 100%; background: #0000AA; }
+    .bios-wrap {
+      background: #0000AA;
+      font-family: 'VT323', monospace;
+      font-size: 18px;
+      color: #AAAAAA;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      user-select: none;
+      outline: none;
+    }
+    .bios-title {
+      background: #AAAAAA;
+      color: #0000AA;
+      text-align: center;
+      padding: 2px 0;
+      font-size: 18px;
+      letter-spacing: 1px;
+    }
+    .bios-body {
+      display: flex;
+      flex: 1;
+      border: 1px solid #AAAAAA;
+      margin: 4px 8px;
+      overflow: hidden;
+    }
+    .bios-left {
+      flex: 1;
+      border-right: 1px solid #AAAAAA;
+      padding: 8px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      overflow-y: auto;
+    }
+    .bios-right {
+      flex: 1;
+      padding: 8px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+      overflow-y: auto;
+    }
+    .menu-item {
+      color: #FFFF55;
+      padding: 2px 4px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .menu-item.selected { background: #AAAAAA; color: #0000AA; }
+    .menu-item:hover:not(.selected):not(.disabled) { color: #FFFFFF; }
+    .menu-item.disabled { color: #555588; cursor: not-allowed; }
+    .menu-separator {
+      color: #5555AA;
+      font-size: 14px;
+      padding: 4px 4px 2px;
+      border-top: 1px solid #5555AA;
+      margin-top: 4px;
+    }
+    .arrow { font-size: 16px; }
+    .log-line { font-size: 16px; margin: 1px 0; line-height: 1.3; }
+    .log-ok    { color: #55FF55; }
+    .log-err   { color: #FF5555; }
+    .log-info  { color: #AAAAAA; }
+    .log-warn  { color: #FFFF55; }
+    .log-white { color: #FFFFFF; }
+    .log-title { color: #FFFFFF; font-size: 17px; margin-bottom: 4px; border-bottom: 1px solid #5555AA; padding-bottom: 2px; }
+    .log-body  { color: #AAAAAA; line-height: 1.5; }
+    .log-link  { color: #55FF55; cursor: pointer; }
+    .log-link:hover { color: #FFFFFF; }
+    .bios-footer {
+      background: #AAAAAA;
+      color: #0000AA;
+      display: flex;
+      justify-content: space-between;
+      padding: 2px 12px;
+      font-size: 16px;
+      margin: 0 8px 4px;
+    }
+    .bios-hint {
+      color: #FFFF55;
+      text-align: center;
+      font-size: 16px;
+      padding: 2px 0 4px;
+      background: #0000AA;
+    }
+    .meta-info {
+      margin-top: auto;
+      color: #5555AA;
+      font-size: 15px;
+      border-top: 1px solid #5555AA;
+      padding-top: 6px;
+    }
+    .virtual-keyboard {
+      display: none;
+      gap: 6px;
+      padding: 6px 8px;
+      background: #0000AA;
+      border-top: 1px solid #5555AA;
+      margin: 0 8px 4px;
+      justify-content: center;
+    }
+    .vkey {
+      font-family: 'VT323', monospace;
+      font-size: 22px;
+      padding: 10px 18px;
+      border: 1px solid #AAAAAA;
+      background: #0000AA;
+      color: #FFFF55;
+      cursor: pointer;
+      border-radius: 4px;
+      flex: 1;
+      text-align: center;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .vkey:active { background: #AAAAAA; color: #0000AA; }
+    .vkey.esc { color: #FF5555; border-color: #FF5555; }
+    .vkey.enter { color: #55FF55; border-color: #55FF55; }
+    .lang-option {
+      color: #FFFF55;
+      padding: 2px 8px;
+      cursor: pointer;
+      display: block;
+      margin-bottom: 4px;
+    }
+    .lang-option.selected { background: #AAAAAA; color: #0000AA; }
+    .lang-option:hover:not(.selected) { color: #FFFFFF; }
+    @media (max-width: 600px) {
+      .virtual-keyboard { display: flex; }
+      .meta-info { display: none; }
+      .mobile-hint { display: block !important; }
+      .bios-body { flex-direction: column; }
+      .bios-left { border-right: none; border-bottom: 1px solid #AAAAAA; flex: none; padding-bottom: 6px; }
+      .bios-right { flex: 1; min-height: 120px; }
+      .menu-item { font-size: 20px; padding: 6px 4px; }
+      .bios-title { font-size: 15px; }
+    }
+    .mobile-hint {
+      display: none;
+      color: #5555AA;
+      font-size: 14px;
+      border-top: 1px solid #5555AA;
+      padding-top: 6px;
+      margin-top: auto;
+    }
+    .cursor { animation: blink 1s step-end infinite; }
+    @keyframes blink { 50% { opacity: 0; } }
+  </style>
+</head>
+<body>
+  <div class="bios-wrap" id="biosWrap" tabindex="0">
+    <div class="bios-title">SERVER WAKE UTILITY &nbsp;–&nbsp; rudex.click &nbsp;–&nbsp; v1.0.0</div>
+    <div class="bios-body">
+      <div class="bios-left" id="menuCol">
+        <div class="menu-item selected" data-idx="0" onclick="handleMenuClick(0)">
+          <span class="arrow">►</span> <span class="t" data-key="menuWake">Włącz serwer</span>
+        </div>
+        <div class="menu-item" data-idx="1" onclick="handleMenuClick(1)">
+          <span class="arrow">&nbsp;</span> <span class="t" data-key="menuStatus">Sprawdź status</span>
+        </div>
+        <div class="menu-item disabled" data-idx="2" id="menuGo" onclick="handleMenuClick(2)">
+          <span class="arrow">&nbsp;</span> <span class="t" data-key="menuGo">Przejdź do serwera</span>
+        </div>
+        <div class="menu-separator">── INFO ──────────</div>
+        <div class="menu-item" data-idx="3" onclick="handleMenuClick(3)">
+          <span class="arrow">&nbsp;</span> <span class="t" data-key="menuProject">Projekt: HomeServer</span>
+        </div>
+        <div class="menu-item" data-idx="4" onclick="handleMenuClick(4)">
+          <span class="arrow">&nbsp;</span> <span class="t" data-key="menuAbout">O mnie</span>
+        </div>
+        <div class="menu-item" data-idx="5" onclick="handleMenuClick(5)">
+          <span class="arrow">&nbsp;</span> <span class="t" data-key="menuLinks">Linki</span>
+        </div>
+        <div class="menu-item" data-idx="6" onclick="handleMenuClick(6)">
+          <span class="arrow">&nbsp;</span> Language
+        </div>
+        <div class="meta-info">Artur Żywczak</div>
+        <div class="mobile-hint">Tryb mobilny<br>Kliknij dwa razy lub użyj<br>klawiatury poniżej</div>
+      </div>
+      <div class="bios-right" id="logCol">
+        <div class="log-line log-info">Inicjalizacja systemu... <span class="cursor">_</span></div>
+      </div>
+    </div>
+    <div class="bios-footer">
+      <span>ESC : <span class="t" data-key="footerCancel">Anuluj</span> &nbsp; ENTER : <span class="t" data-key="footerSelect">Wybierz</span></span>
+      <span>↑ ↓ : <span class="t" data-key="footerNav">Nawigacja</span></span>
+    </div>
+    <div class="bios-hint" id="hintBar">Proszę czekać...</div>
+    <div class="virtual-keyboard">
+      <button class="vkey esc" onclick="vkeyEsc()">ESC</button>
+      <button class="vkey" onclick="vkeyUp()">↑</button>
+      <button class="vkey" onclick="vkeyDown()">↓</button>
+      <button class="vkey enter" onclick="vkeyEnter()">ENTER</button>
+    </div>
+  </div>
+
+  <script>
+    const translations = {
+      pl: {
+        menuWake:    'Włącz serwer',
+        menuStatus:  'Sprawdź status',
+        menuGo:      'Przejdź do serwera',
+        menuProject: 'Projekt: HomeServer',
+        menuAbout:   'O mnie',
+        menuLinks:   'Linki',
+        footerCancel: 'Anuluj',
+        footerSelect: 'Wybierz',
+        footerNav:    'Nawigacja',
+        hintWait:     'Proszę czekać...',
+        hintUse:      'Użyj menu lub klawiatury poniżej',
+        hintOnline:   'Serwer działa — wybierz "Przejdź do serwera"',
+        hintOffline:  'Serwer offline — wybierz "Włącz serwer"',
+        hintWaking:   'Serwer się budzi — proszę czekać...',
+        hintReady:    'Serwer gotowy!',
+        hintAborted:  'Wybierz opcję z menu',
+        hintCancelled:'Anulowano — wybierz opcję',
+        hintNginx:    'Serwer online! Sprawdzam czy nginx gotowy...',
+        projectTitle: 'Projekt: HomeServer',
+        projectBody:  'Stworzyłem ten serwer, żeby odświeżyć wiedzę o infrastrukturze i mieć własny sandbox do testowania pomysłów. Działa na stacjonarnym PC z Ubuntu Server w mojej sieci domowej.\n\nŻeby nie marnować prądu i nie tworzyć hałasu serwer jest wyłączony kiedy nikt z niego nie korzysta. Rolę "strażnika" pełni Raspberry Pi Zero W działający 24/7. To właśnie na nim jest postawiona ta strona. Pi oprócz dostarczania tej strony sprawdza czy główny serwer jest online i w razie potrzeby uruchamia go przez Wake-on-LAN.\n\nPubliczny dostęp bez otwierania portów i publicznego adresu IP zapewnia Cloudflare Tunnel - ruch z mojej domeny rudex.click trafia przez zaszyfrowany tunel prosto do Pi.\n\nMinusem jest prędkość, w domu mam internet radiowy 12/3 Mbps. Strony mogą ładować się powoli.\n\nStack technologiczny\nPi Zero W: nginx, Node.js, Cloudflare Tunnel\nSerwer: Docker, nginx, ASP.NET Core, MariaDB',
+        aboutTitle:   'O mnie',
+        aboutBody:    'Cześć, jestem Artur - inżynier informatyk ze specjalizacją w inżynierii oprogramowania (ATH Bielsko-Biała, 2022).\n\nPrzez prawie 10 lat pracowałem w schronisku górskim, gdzie zaczynałem od pomocy kuchennej a skończyłem na stanowisku menedżerskim. Pomimo pracy w innej branży starałem się wprowadzić i szlifować moje zdolności techniczne. Na schronisku zajmowałem się wieloma rzeczami, poniżej kilka przykładów bardziej technicznych w których korzystałem ze swojego wykształcenia:\n\n- Redagowanie strony schroniska (WordPress)\n- Założenie sieci Starlink razem z zaplanowaniem sieci wewnętrznej (urządzenia POS, terminale, bonownice, sieć dla pracowników i osobna dla gości, monitoring)\n- Zaprojektowanie, wdrożenie i utrzymanie zamków elektronicznych (tworzenie kart dla gości, pracowników, awaryjnych, programowanie zamka programem BisHotel)\n- Obsługa systemu POSBistro (konta pracowników, uprawnienia, menu, wprowadzanie inwentaryzacji, wdrożenie systemu kaucyjnego)\n\nTechnologie z którymi pracuję: C# / ASP.NET Core / EF Core, Docker, SQL, JavaScript. Do tego trochę Blazora, .NET MAUI i tego co akurat potrzeba.\n\nKwalifikacje zawodowe: Technik Informatyk (E.12, E.13, E.14), Inżynier Informatyk, CCNAv7 Switching, Routing & Wireless Essentials.',
+        linksTitle:   'Linki',
+      },
+      en: {
+        menuWake:    'Wake server',
+        menuStatus:  'Check status',
+        menuGo:      'Go to server',
+        menuProject: 'Project: HomeServer',
+        menuAbout:   'About me',
+        menuLinks:   'Links',
+        footerCancel: 'Cancel',
+        footerSelect: 'Select',
+        footerNav:    'Navigate',
+        hintWait:     'Please wait...',
+        hintUse:      'Use menu or keyboard below',
+        hintOnline:   'Server online — select "Go to server"',
+        hintOffline:  'Server offline — select "Wake server"',
+        hintWaking:   'Server is waking up — please wait...',
+        hintReady:    'Server ready!',
+        hintAborted:  'Select an option',
+        hintCancelled:'Cancelled — select an option',
+        hintNginx:    'Server online! Checking if nginx is ready...',
+        projectTitle: 'Project: HomeServer',
+        projectBody:  'I built this server to brush up on my infrastructure knowledge and have a personal sandbox for testing ideas. It runs on a desktop PC with Ubuntu Server on my home network.\n\nTo avoid wasting power and unnecessary noise, the server stays off when nobody\'s using it. A Raspberry Pi Zero W acts as the "guard", running 24/7. That\'s where this page is hosted. Besides serving this page, the Pi checks whether the main server is online and, if the user requests, wakes it up via Wake-on-LAN.\n\nPublic access without opening ports or having a public IP is handled by Cloudflare Tunnel - traffic from my domain rudex.click travels through an encrypted tunnel directly to the Pi.\n\nThe downside is speed - I have a wireless home connection at 12/3 Mbps, so pages may load slowly.\n\nTech stack\nPi Zero W: nginx, Node.js, Cloudflare Tunnel\nServer: Docker, nginx, ASP.NET Core, MariaDB',
+        aboutTitle:   'About me',
+        aboutBody:    'Hey, I\'m Artur - a software engineering graduate (ATH Bielsko-Biała, 2022).\n\nFor almost 10 years I worked at a mountain shelter, starting as kitchen help and ending up in a management position. Despite working in a different industry I kept trying to develop and sharpen my technical skills. At the shelter I handled many things, here are a few more technical ones where I put my education to use:\n\n- Managing the shelter\'s website (WordPress)\n- Setting up a Starlink network including internal infrastructure planning (POS devices, terminals, printers, separate networks for staff and guests, CCTV)\n- Designing, deploying and maintaining an electronic lock system (guest, staff and emergency cards, programming via BisHotel)\n- Managing the POSBistro system (staff accounts, permissions, menu, inventory, deposit system rollout)\n\nTechnologies I work with: C# / ASP.NET Core / EF Core, Docker, SQL, JavaScript. Plus some Blazor, .NET MAUI and whatever the project calls for.\n\nQualifications: IT Technician (E.12, E.13, E.14), Software Engineering degree, CCNAv7 Switching, Routing & Wireless Essentials.',
+        linksTitle:   'Links',
+      }
+    };
+
+    let currentLang = localStorage.getItem('lang') || 'pl';
+
+    function t(key) { return translations[currentLang][key] || key; }
+
+    function applyTranslations() {
+      document.querySelectorAll('.t[data-key]').forEach(el => {
+        el.textContent = t(el.dataset.key);
+      });
+    }
+
+    function setLang(lang) {
+      currentLang = lang;
+      localStorage.setItem('lang', lang);
+      applyTranslations();
+      document.querySelectorAll('.lang-option').forEach(el => {
+        el.classList.toggle('selected', el.dataset.lang === lang);
+      });
+    }
+
+    const API_BASE   = '';
+    const SERVER_URL = 'https://main.rudex.click';
+    const MAX_POLL_ATTEMPTS   = 6;
+    const MAX_READY_ATTEMPTS  = 6;
+    const POLL_INTERVAL  = 30;
+    const READY_INTERVAL = 10;
+
+    let selectedIdx     = 0;
+    let serverOnline    = false;
+    let polling         = false;
+    let busy            = false;
+    let countdownTimer  = null;
+    let countdownLineEl = null;
+    let redirectCountdown = null;
+    let redirectAborted   = false;
+    let lastClickIdx    = -1;
+    let lastClickTime   = 0;
+    const MENU_COUNT    = 7;
+
+    function log(text, cls) {
+      const col = document.getElementById('logCol');
+      const d = document.createElement('div');
+      d.className = 'log-line ' + (cls || 'log-info');
+      d.innerHTML = text;
+      col.appendChild(d);
+      col.scrollTop = col.scrollHeight;
+      return d;
+    }
+
+    function clearLog() {
+      document.getElementById('logCol').innerHTML = '';
+      countdownLineEl = null;
+    }
+
+    function setHint(text) { document.getElementById('hintBar').textContent = text; }
+
+    function selectItem(idx) {
+      selectedIdx = idx;
+      document.querySelectorAll('.menu-item').forEach(el => {
+        const i = parseInt(el.dataset.idx);
+        el.classList.toggle('selected', i === idx);
+        const arrow = el.querySelector('.arrow');
+        if (arrow) arrow.innerHTML = i === idx ? '►' : '&nbsp;';
+      });
+    }
+
+    function setServerOnline(online) {
+      serverOnline = online;
+      const goItem = document.getElementById('menuGo');
+      if (online) goItem.classList.remove('disabled');
+      else goItem.classList.add('disabled');
+    }
+
+    async function apiStatus() {
+      try {
+        const res = await fetch(API_BASE + '/api/status');
+        const data = await res.json();
+        return data.online;
+      } catch(e) { return false; }
+    }
+
+    async function apiReady() {
+      try {
+        const res = await fetch(API_BASE + '/api/ready');
+        const data = await res.json();
+        return data.ready;
+      } catch(e) { return false; }
+    }
+
+    function abortRedirect() {
+      if (redirectCountdown) {
+        clearInterval(redirectCountdown);
+        redirectCountdown = null;
+        busy = false;
+        log('> Przekierowanie przerwane.', 'log-err');
+        setHint(t('hintAborted'));
+      }
+      redirectAborted = true;
+    }
+
+    function startAutoRedirect() {
+      let c = 5;
+      let cdLine = log('> Przechodzę za ' + c + '... (naciśnij dowolny klawisz lub kliknij aby przerwać)', 'log-warn');
+      setHint('Naciśnij dowolny klawisz aby przerwać przekierowanie');
+      redirectAborted = false;
+
+      redirectCountdown = setInterval(() => {
+        if (redirectAborted) { clearInterval(redirectCountdown); redirectCountdown = null; return; }
+        c--;
+        if (c > 0) {
+          cdLine.innerHTML = '> Przechodzę za ' + c + '... (naciśnij dowolny klawisz lub kliknij aby przerwać)';
+        } else {
+          clearInterval(redirectCountdown);
+          redirectCountdown = null;
+          window.location.href = SERVER_URL;
+        }
+      }, 1000);
+
+      document.getElementById('biosWrap').addEventListener('click', abortRedirect, { once: true });
+    }
+
+    function stopPolling() {
+      polling = false;
+      if (countdownTimer) { clearInterval(countdownTimer); countdownTimer = null; }
+      countdownLineEl = null;
+    }
+
+    function startCountdown(seconds, label, onDone) {
+      if (countdownTimer) clearInterval(countdownTimer);
+      let left = seconds;
+      countdownLineEl = log('>> ' + label + left + 's (ESC aby anulować)', 'log-warn');
+      countdownTimer = setInterval(() => {
+        left--;
+        if (countdownLineEl) countdownLineEl.innerHTML = '>> ' + label + left + 's (ESC aby anulować)';
+        if (left <= 0) { clearInterval(countdownTimer); countdownTimer = null; onDone(); }
+      }, 1000);
+    }
+
+    // Faza 2: sprawdź czy nginx gotowy
+    async function readyLoop(attempt) {
+      if (!polling) return;
+      log('> Sprawdzam czy nginx gotowy... Próba ' + attempt + '/' + MAX_READY_ATTEMPTS, 'log-info');
+      const ready = await apiReady();
+      if (ready) {
+        stopPolling();
+        log('> Nginx gotowy! STATUS: READY ✓', 'log-ok');
+        setServerOnline(true);
+        setHint(t('hintReady'));
+        startAutoRedirect();
+        return;
+      }
+      if (attempt >= MAX_READY_ATTEMPTS) {
+        stopPolling();
+        log('> Nginx nie odpowiada. Spróbuj wejść ręcznie.', 'log-err');
+        setServerOnline(true);
+        busy = false;
+        setHint(t('hintOnline'));
+        return;
+      }
+      startCountdown(READY_INTERVAL, 'Nginx nie gotowy, kolejna próba za ', () => {
+        if (polling) readyLoop(attempt + 1);
+      });
+    }
+
+    // Faza 1: sprawdź czy serwer żyje
+    async function pollLoop(attempt) {
+      if (!polling) return;
+      log('> Sprawdzam czy serwer wstał... Próba ' + attempt + '/' + MAX_POLL_ATTEMPTS, 'log-info');
+      const online = await apiStatus();
+      if (online) {
+        stopPolling();
+        log('> Serwer online! ✓', 'log-ok');
+        log('> ' + t('hintNginx'), 'log-warn');
+        setHint(t('hintNginx'));
+        polling = true;
+        await sleep(1000);
+        readyLoop(1);
+        return;
+      }
+      if (attempt >= MAX_POLL_ATTEMPTS) {
+        stopPolling();
+        log('> Przekroczono limit prób (' + MAX_POLL_ATTEMPTS + ').', 'log-err');
+        log('> Serwer nie odpowiada. Spróbuj ponownie.', 'log-err');
+        setHint('Serwer nie wstał — spróbuj ponownie');
+        busy = false;
+        return;
+      }
+      startCountdown(POLL_INTERVAL, 'Próba nieudana, kolejna za ', () => {
+        if (polling) pollLoop(attempt + 1);
+      });
+    }
+
+    async function doWake() {
+      if (busy && !redirectCountdown) return;
+      if (redirectCountdown) { abortRedirect(); return; }
+      busy = true;
+      stopPolling();
+      clearLog();
+      log('> Inicjalizacja procedury budzenia...', 'log-info');
+      await sleep(400);
+      log('> Sprawdzam czy serwer już działa...', 'log-info');
+      const online = await apiStatus();
+      if (online) {
+        log('> Serwer online! Sprawdzam nginx...', 'log-ok');
+        polling = true;
+        readyLoop(1);
+        return;
+      }
+      log('> STATUS: OFFLINE ✗', 'log-err');
+      await sleep(300);
+      log('> Wysyłam magic packet WoL...', 'log-warn');
+      log('> Docelowy MAC: 30:9c:23:63:a4:de', 'log-info');
+      try {
+        await fetch(API_BASE + '/api/wake', { method: 'POST' });
+        log('> Magic packet wysłany! ✓', 'log-ok');
+      } catch(e) {
+        log('> Błąd wysyłania pakietu: ' + e.message, 'log-err');
+        busy = false;
+        return;
+      }
+      await sleep(400);
+      log('> Oczekuję na start serwera...', 'log-info');
+      log('> Maks. ' + MAX_POLL_ATTEMPTS + ' prób co ' + POLL_INTERVAL + 's, potem ' + MAX_READY_ATTEMPTS + ' prób nginx co ' + READY_INTERVAL + 's', 'log-warn');
+      setHint(t('hintWaking'));
+      polling = true;
+      await sleep(5000);
+      pollLoop(1);
+    }
+
+    async function doStatus() {
+      if (busy && !redirectCountdown) return;
+      if (redirectCountdown) { abortRedirect(); return; }
+      busy = true;
+      stopPolling();
+      clearLog();
+      log('> Sprawdzam status serwera...', 'log-info');
+      const online = await apiStatus();
+      if (online) {
+        log('> STATUS: ONLINE ✓', 'log-ok');
+        const ready = await apiReady();
+        if (ready) {
+          log('> Nginx: READY ✓', 'log-ok');
+          setServerOnline(true);
+          setHint(t('hintOnline'));
+        } else {
+          log('> Nginx: nie gotowy jeszcze', 'log-warn');
+          setHint(t('hintOnline'));
+        }
+      } else {
+        log('> STATUS: OFFLINE ✗', 'log-err');
+        setHint(t('hintOffline'));
+      }
+      busy = false;
+    }
+
+    async function doGo() {
+      if (redirectCountdown) { abortRedirect(); return; }
+      if (!serverOnline) { log('> Serwer jest offline. Najpierw go włącz.', 'log-err'); return; }
+      log('> Przekierowuję na serwer...', 'log-ok');
+      await sleep(600);
+      window.location.href = SERVER_URL;
+    }
+
+    function doProject() {
+      clearLog();
+      const col = document.getElementById('logCol');
+      const title = document.createElement('div');
+      title.className = 'log-line log-title';
+      title.textContent = t('projectTitle');
+      col.appendChild(title);
+      t('projectBody').split('\n').forEach(line => {
+        const l = document.createElement('div');
+        l.className = 'log-line log-body';
+        l.textContent = line || ' ';
+        col.appendChild(l);
+      });
+    }
+
+    function doAbout() {
+      clearLog();
+      const col = document.getElementById('logCol');
+      const title = document.createElement('div');
+      title.className = 'log-line log-title';
+      title.textContent = t('aboutTitle');
+      col.appendChild(title);
+      t('aboutBody').split('\n').forEach(line => {
+        const l = document.createElement('div');
+        l.className = 'log-line log-body';
+        l.textContent = line || ' ';
+        col.appendChild(l);
+      });
+    }
+
+    function doLinks() {
+      clearLog();
+      const col = document.getElementById('logCol');
+      const title = document.createElement('div');
+      title.className = 'log-line log-title';
+      title.textContent = t('linksTitle');
+      col.appendChild(title);
+
+      const links = [
+        { label: 'Email',    href: 'mailto:artzywcz@gmail.com',                          text: 'artzywcz@gmail.com' },
+        { label: 'GitHub',   href: 'https://github.com/ArturZywczak',                    text: 'github.com/ArturZywczak' },
+        { label: 'LinkedIn', href: 'https://www.linkedin.com/in/artur-żywczak-ab27b7413', text: 'linkedin.com/in/artur-żywczak' },
+      ];
+
+      links.forEach(link => {
+        const l = document.createElement('div');
+        l.className = 'log-line log-link';
+        l.innerHTML = `► ${link.label}: <span style="color:#55FF55">${link.text}</span>`;
+        l.onclick = () => window.open(link.href, '_blank');
+        col.appendChild(l);
+      });
+    }
+
+    function doLanguage() {
+      clearLog();
+      const col = document.getElementById('logCol');
+      const title = document.createElement('div');
+      title.className = 'log-line log-title';
+      title.textContent = 'Language / Język';
+      col.appendChild(title);
+      const hint = document.createElement('div');
+      hint.className = 'log-line log-info';
+      hint.textContent = 'Wybierz język / Select language:';
+      col.appendChild(hint);
+      const spacer = document.createElement('div');
+      spacer.style.marginTop = '8px';
+      ['pl', 'en'].forEach(lang => {
+        const btn = document.createElement('div');
+        btn.className = 'lang-option' + (currentLang === lang ? ' selected' : '');
+        btn.dataset.lang = lang;
+        btn.textContent = lang === 'pl' ? '► Polski' : '► English';
+        btn.onclick = () => {
+          setLang(lang);
+          const ok = document.createElement('div');
+          ok.className = 'log-line log-ok';
+          ok.textContent = '> Język zmieniony / Language changed ✓';
+          col.appendChild(ok);
+          col.scrollTop = col.scrollHeight;
+        };
+        spacer.appendChild(btn);
+      });
+      col.appendChild(spacer);
+    }
+
+    function handleMenuClick(idx) {
+      const isMobile = window.innerWidth <= 600;
+      const now = Date.now();
+      if (isMobile) {
+        if (lastClickIdx === idx && now - lastClickTime < 500) {
+          lastClickIdx = -1;
+          selectItem(idx);
+          executeAction(idx);
+        } else {
+          lastClickIdx = idx;
+          lastClickTime = now;
+          selectItem(idx);
+        }
+      } else {
+        selectItem(idx);
+        executeAction(idx);
+      }
+    }
+
+    function executeAction(idx) {
+      if (idx === 0) doWake();
+      else if (idx === 1) doStatus();
+      else if (idx === 2) doGo();
+      else if (idx === 3) doProject();
+      else if (idx === 4) doAbout();
+      else if (idx === 5) doLinks();
+      else if (idx === 6) doLanguage();
+    }
+
+    function executeSelected() {
+      if (redirectCountdown) { abortRedirect(); return; }
+      if (busy && selectedIdx < 3) return;
+      executeAction(selectedIdx);
+    }
+
+    function vkeyUp()    { selectItem((selectedIdx + MENU_COUNT - 1) % MENU_COUNT); }
+    function vkeyDown()  { selectItem((selectedIdx + 1) % MENU_COUNT); }
+    function vkeyEnter() { executeSelected(); }
+    function vkeyEsc() {
+      if (redirectCountdown) { abortRedirect(); return; }
+      if (polling) {
+        stopPolling();
+        busy = false;
+        log('> Anulowano oczekiwanie.', 'log-err');
+        setHint(t('hintCancelled'));
+      }
+    }
+
+    document.getElementById('biosWrap').addEventListener('keydown', (e) => {
+      if (redirectCountdown) { abortRedirect(); return; }
+      if (e.key === 'ArrowDown') { e.preventDefault(); vkeyDown(); }
+      else if (e.key === 'ArrowUp') { e.preventDefault(); vkeyUp(); }
+      else if (e.key === 'Enter') { e.preventDefault(); executeSelected(); }
+      else if (e.key === 'Escape') { vkeyEsc(); }
+    });
+
+    function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+    applyTranslations();
+    document.getElementById('biosWrap').focus();
+
+    (async () => {
+      await sleep(300);
+      log('> Inicjalizacja zakończona.', 'log-ok');
+      await sleep(200);
+      log('> Sprawdzam status serwera...', 'log-info');
+      const online = await apiStatus();
+      if (online) {
+        log('> STATUS: ONLINE ✓', 'log-ok');
+        const ready = await apiReady();
+        if (ready) {
+          log('> Nginx: READY ✓', 'log-ok');
+          log('> Serwer jest online!', 'log-ok');
+          setServerOnline(true);
+          busy = true;
+          startAutoRedirect();
+        } else {
+          log('> Nginx jeszcze nie gotowy...', 'log-warn');
+          polling = true;
+          readyLoop(1);
+        }
+      } else {
+        log('> STATUS: OFFLINE ✗', 'log-err');
+        log('> Serwer niedostępny.', 'log-err');
+        log('> Wybierz opcję z menu po lewej.', 'log-info');
+        setHint(t('hintUse'));
+      }
+    })();
+  </script>
+</body>
+</html>
