@@ -498,20 +498,21 @@
       log('> Sprawdzam status serwera...', 'log-info');
       const online = await apiStatus();
       if (online) {
-        log('> STATUS: ONLINE ✓', 'log-ok');
-        const ready = await apiReady();
-        if (ready) {
-          log('> Nginx: READY ✓', 'log-ok');
-          setServerOnline(true);
-          setHint(t('hintOnline'));
-        } else {
-          log('> Nginx: nie gotowy jeszcze', 'log-warn');
-          setHint(t('hintOnline'));
-        }
-      } else {
-        log('> STATUS: OFFLINE ✗', 'log-err');
-        setHint(t('hintOffline'));
-      }
+		  log('> STATUS: ONLINE ✓', 'log-ok');
+		  const ready = await apiReady();
+		  if (ready) {
+			log('> Nginx: READY ✓', 'log-ok');
+			setServerOnline(true);
+			setHint(t('hintOnline'));
+		  } else {
+			log('> Nginx: nie gotowy jeszcze', 'log-warn');
+			setHint(t('hintOnline'));
+		  }
+		} else {
+		  log('> STATUS: OFFLINE ✗', 'log-err');
+		  setServerOnline(false);
+		  setHint(t('hintOffline'));
+		}
       busy = false;
     }
 
