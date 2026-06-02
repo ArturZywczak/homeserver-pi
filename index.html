@@ -220,7 +220,7 @@
         footerSelect: 'Wybierz',
         footerNav:    'Nawigacja',
         hintWait:     'Proszę czekać...',
-        hintUse:      'Użyj menu lub klawiatury poniżej',
+        hintUse:      'Użyj menu lub klawiszy ↑ ↓ ENTER',
         hintOnline:   'Serwer działa — wybierz "Przejdź do serwera"',
         hintOffline:  'Serwer offline — wybierz "Włącz serwer"',
         hintWaking:   'Serwer się budzi — proszę czekać...',
@@ -245,7 +245,7 @@
         footerSelect: 'Select',
         footerNav:    'Navigate',
         hintWait:     'Please wait...',
-        hintUse:      'Use menu or keyboard below',
+        hintUse:      'Use menu or ↑ ↓ ENTER keys',
         hintOnline:   'Server online — select "Go to server"',
         hintOffline:  'Server offline — select "Wake server"',
         hintWaking:   'Server is waking up — please wait...',
@@ -471,10 +471,10 @@
       log('> STATUS: OFFLINE ✗', 'log-err');
       await sleep(300);
       log('> Wysyłam magic packet WoL...', 'log-warn');
-      log('> Docelowy MAC: 30:9c:23:63:a4:de', 'log-info');
       try {
         await fetch(API_BASE + '/api/wake', { method: 'POST' });
         log('> Magic packet wysłany! ✓', 'log-ok');
+		log('> Serwer zazwyczaj startuje w ciągu 2-3 minut.', 'log-warn');
       } catch(e) {
         log('> Błąd wysyłania pakietu: ' + e.message, 'log-err');
         busy = false;
@@ -515,13 +515,20 @@
       busy = false;
     }
 
-    async function doGo() {
-      if (redirectCountdown) { abortRedirect(); return; }
-      if (!serverOnline) { log('> Serwer jest offline. Najpierw go włącz.', 'log-err'); return; }
-      log('> Przekierowuję na serwer...', 'log-ok');
-      await sleep(600);
-      window.location.href = SERVER_URL;
-    }
+	async function doGo() {
+	  if (redirectCountdown) { abortRedirect(); return; }
+	  if (!serverOnline) { log('> Serwer jest offline. Najpierw go włącz.', 'log-err'); return; }
+	  log('> Sprawdzam połączenie...', 'log-info');
+	  const online = await apiStatus();
+	  if (!online) {
+		log('> Serwer nie odpowiada! Połączenie utracone.', 'log-err');
+		setServerOnline(false);
+		return;
+	  }
+	  log('> Przekierowuję na serwer...', 'log-ok');
+	  await sleep(600);
+	  window.location.href = SERVER_URL;
+	}
 
     function doProject() {
       clearLog();
