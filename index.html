@@ -345,8 +345,8 @@
       try {
         const res = await fetch(API_BASE + '/api/ready');
         const data = await res.json();
-        return data.ready;
-      } catch(e) { return false; }
+        return data;
+      } catch(e) { return { ready: false }; }
     }
 
     function abortRedirect() {
@@ -398,28 +398,38 @@
       }, 1000);
     }
 
-    // Faza 2: sprawdź czy nginx gotowy
+    // Faza 2: sprawdź czy nginx gotowy + tunel Cloudflare
     async function readyLoop(attempt) {
       if (!polling) return;
-      log('> Sprawdzam czy nginx gotowy... Próba ' + attempt + '/' + MAX_READY_ATTEMPTS, 'log-info');
-      const ready = await apiReady();
-      if (ready) {
+      log('> Sprawdzam nginx i tunel Cloudflare... Próba ' + attempt + '/' + MAX_READY_ATTEMPTS, 'log-info');
+      const result = await apiReady();
+      if (result.ready) {
         stopPolling();
-        log('> Nginx gotowy! STATUS: READY ✓', 'log-ok');
+        if (result.tunnel !== undefined) {
+          log('> Nginx: OK ✓  |  Tunel Cloudflare: OK ✓', 'log-ok');
+        } else {
+          log('> Nginx: OK ✓', 'log-ok');
+        }
+        log('> STATUS: READY ✓', 'log-ok');
         setServerOnline(true);
         setHint(t('hintReady'));
         startAutoRedirect();
         return;
       }
+      if (result.local === true && result.tunnel === false) {
+        log('> Nginx: OK ✓  |  Tunel Cloudflare: niedostępny...', 'log-warn');
+      } else if (result.local === false) {
+        log('> Nginx: nie gotowy jeszcze...', 'log-warn');
+      }
       if (attempt >= MAX_READY_ATTEMPTS) {
         stopPolling();
-        log('> Nginx nie odpowiada. Spróbuj wejść ręcznie.', 'log-err');
+        log('> Przekroczono limit prób. Spróbuj wejść ręcznie.', 'log-err');
         setServerOnline(true);
         busy = false;
         setHint(t('hintOnline'));
         return;
       }
-      startCountdown(READY_INTERVAL, 'Nginx nie gotowy, kolejna próba za ', () => {
+      startCountdown(READY_INTERVAL, 'Kolejna próba za ', () => {
         if (polling) readyLoop(attempt + 1);
       });
     }
@@ -463,7 +473,7 @@
       log('> Sprawdzam czy serwer już działa...', 'log-info');
       const online = await apiStatus();
       if (online) {
-        log('> Serwer online! Sprawdzam nginx...', 'log-ok');
+        log('> Serwer online! Sprawdzam nginx i tunel...', 'log-ok');
         polling = true;
         readyLoop(1);
         return;
@@ -499,10 +509,18 @@
       const online = await apiStatus();
       if (online) {
 		  log('> STATUS: ONLINE ✓', 'log-ok');
-		  const ready = await apiReady();
-		  if (ready) {
-			log('> Nginx: READY ✓', 'log-ok');
+		  log('> Sprawdzam nginx i tunel Cloudflare...', 'log-info');
+		  const result = await apiReady();
+		  if (result.ready) {
+			if (result.tunnel !== undefined) {
+			  log('> Nginx: OK ✓  |  Tunel Cloudflare: OK ✓', 'log-ok');
+			} else {
+			  log('> Nginx: READY ✓', 'log-ok');
+			}
 			setServerOnline(true);
+			setHint(t('hintOnline'));
+		  } else if (result.local === true && result.tunnel === false) {
+			log('> Nginx: OK ✓  |  Tunel Cloudflare: niedostępny', 'log-warn');
 			setHint(t('hintOnline'));
 		  } else {
 			log('> Nginx: nie gotowy jeszcze', 'log-warn');
@@ -684,15 +702,24 @@
       const online = await apiStatus();
       if (online) {
         log('> STATUS: ONLINE ✓', 'log-ok');
-        const ready = await apiReady();
-        if (ready) {
-          log('> Nginx: READY ✓', 'log-ok');
+        log('> Sprawdzam nginx i tunel Cloudflare...', 'log-info');
+        const result = await apiReady();
+        if (result.ready) {
+          if (result.tunnel !== undefined) {
+            log('> Nginx: OK ✓  |  Tunel Cloudflare: OK ✓', 'log-ok');
+          } else {
+            log('> Nginx: READY ✓', 'log-ok');
+          }
           log('> Serwer jest online!', 'log-ok');
           setServerOnline(true);
           busy = true;
           startAutoRedirect();
         } else {
-          log('> Nginx jeszcze nie gotowy...', 'log-warn');
+          if (result.local === true && result.tunnel === false) {
+            log('> Nginx: OK ✓  |  Tunel Cloudflare: nie gotowy...', 'log-warn');
+          } else {
+            log('> Nginx jeszcze nie gotowy...', 'log-warn');
+          }
           polling = true;
           readyLoop(1);
         }
