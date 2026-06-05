@@ -39,7 +39,7 @@ app.get("/api/ready", async (req, res) => {
     return res.json({ ready: local });
   }
 
-  const tunnelCode = await httpGet(`${TUNNEL_URL}/healthz`, 5000);
+  const tunnelCode = await httpGet(`${TUNNEL_URL}/healthz`, 15000);
   const tunnel = tunnelCode === 200;
   res.json({ ready: local && tunnel, local, tunnel });
 });
